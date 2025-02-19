@@ -248,8 +248,9 @@ class Dictionary:
 
         lines = f.readlines()
         indices_start_line = self._load_meta(lines)
-
+        ''' 
         for line in lines[indices_start_line:]:
+            
             try:
                 line, field = line.rstrip().rsplit(" ", 1)
                 if field == "#fairseq:overwrite":
@@ -272,7 +273,12 @@ class Dictionary:
                 raise ValueError(
                     f"Incorrect dictionary format, expected '<token> <cnt> [flags]': \"{line}\""
                 )
-
+        '''   
+        for line in lines[indices_start_line:]:
+            word, freq = line.strip().split()
+            if word in self.indices:continue
+            else:self.add_symbol(word, n=int(freq), overwrite=False)
+        
     def _save(self, f, kv_iterator):
         if isinstance(f, str):
             PathManager.mkdirs(os.path.dirname(f))
