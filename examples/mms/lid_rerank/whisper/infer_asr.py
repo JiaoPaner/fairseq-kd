@@ -4,7 +4,7 @@ import argparse
 import itertools
 import os
 import re
-import sys 
+import sys
 from pathlib import Path
 
 import whisper
@@ -26,14 +26,23 @@ if __name__ == "__main__":
     model = whisper.load_model(args.model)
 
     print(args)
-    
-    wavs = [y for y in [x.strip() for x in open(args.wavs, "r").readlines()] for _ in range(args.n)]
+
+    wavs = [
+        y
+        for y in [x.strip() for x in open(args.wavs, "r").readlines()]
+        for _ in range(args.n)
+    ]
     lids = [x.strip() for x in open(args.lids, "r").readlines()]
     assert len(wavs) == len(lids)
 
     if args.mapping is not None:
         # mms_lid_code:whisper_lid_code
-        mapping = {x[1]:x[0] for x in [l.strip().split(";", 1) for l in open(args.mapping, "r").readlines()]}
+        mapping = {
+            x[1]: x[0]
+            for x in [
+                l.strip().split(";", 1) for l in open(args.mapping, "r").readlines()
+            ]
+        }
     else:
         mapping = None
 
@@ -41,9 +50,11 @@ if __name__ == "__main__":
         os.makedirs(args.dst)
 
     # clear it
-    with open(args.dst + "/nbest_asr_hyp", "w") as f1, open(args.dst + "/asr_score", "w") as f2:
+    with open(args.dst + "/nbest_asr_hyp", "w") as f1, open(
+        args.dst + "/asr_score", "w"
+    ) as f2:
         pass
-    
+
     for wav, lang in tqdm(zip(wavs, lids)):
         # load audio and pad/trim it to fit 30 seconds
         audio = whisper.load_audio(wav)
@@ -64,7 +75,9 @@ if __name__ == "__main__":
         length = len(output.tokens)
         score = output.avg_logprob * length
 
-        with open(args.dst + "/nbest_asr_hyp", "a") as f1, open(args.dst + "/asr_score", "a") as f2:
+        with open(args.dst + "/nbest_asr_hyp", "a") as f1, open(
+            args.dst + "/asr_score", "a"
+        ) as f2:
             f1.write(result + "\n")
             f2.write(str(score) + "\n")
             f1.flush()

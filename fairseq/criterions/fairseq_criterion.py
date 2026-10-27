@@ -72,7 +72,7 @@ class FairseqCriterion(_Loss):
 
     @staticmethod
     def aggregate_logging_outputs(
-        logging_outputs: List[Dict[str, Any]]
+        logging_outputs: List[Dict[str, Any]],
     ) -> Dict[str, Any]:
         """Aggregate logging outputs from data parallel training."""
         utils.deprecation_warning(

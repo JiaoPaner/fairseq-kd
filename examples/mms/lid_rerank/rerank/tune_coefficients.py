@@ -8,13 +8,14 @@ from functools import partial
 
 cer_langs = [x.strip() for x in open("cer_langs.txt", "r").readlines()]
 
+
 def compute(w, feats, ref_lid, nbest_lid, ref_asr, nbest_asr, n=10, exclude=None):
     assert len(w) == len(feats[0])
     scores = []
     for f in feats:
         s = 0
         for i in range(len(w)):
-            s += w[i]*f[i]
+            s += w[i] * f[i]
         scores.append(s)
 
     lid_correct = 0
@@ -40,8 +41,26 @@ def compute(w, feats, ref_lid, nbest_lid, ref_asr, nbest_asr, n=10, exclude=None
         ref = ref_asr[i]
         hyp = hyp.lower()
         ref = ref.lower()
-        hyp = hyp.replace(".", "").replace(",", "").replace("?", "").replace("!", "").replace(":", "").replace(")", "").replace("(", "").replace("-", "")
-        ref = ref.replace(".", "").replace(",", "").replace("?", "").replace("!", "").replace(":", "").replace(")", "").replace("(", "").replace("-", "")
+        hyp = (
+            hyp.replace(".", "")
+            .replace(",", "")
+            .replace("?", "")
+            .replace("!", "")
+            .replace(":", "")
+            .replace(")", "")
+            .replace("(", "")
+            .replace("-", "")
+        )
+        ref = (
+            ref.replace(".", "")
+            .replace(",", "")
+            .replace("?", "")
+            .replace("!", "")
+            .replace(":", "")
+            .replace(")", "")
+            .replace("(", "")
+            .replace("-", "")
+        )
         if ref_lid[i] in cer_langs:
             hyp = " ".join(hyp)
             ref = " ".join(ref)
@@ -52,30 +71,35 @@ def compute(w, feats, ref_lid, nbest_lid, ref_asr, nbest_asr, n=10, exclude=None
         asr_err += errs
         asr_total += len(tgt_words)
 
-    return {"lid_acc": lid_correct / lid_total, "asr_wer": asr_err / asr_total, "weights": w}
+    return {
+        "lid_acc": lid_correct / lid_total,
+        "asr_wer": asr_err / asr_total,
+        "weights": w,
+    }
+
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Example argument parser')
-    parser.add_argument('--slid', type=str)
-    parser.add_argument('--wlid', type=str)
-    parser.add_argument('--asr', type=str)
-    parser.add_argument('--lm', type=str)
-    parser.add_argument('--uasr', type=str)
-    parser.add_argument('--n', type=int, default=10)
-    parser.add_argument('--dst', type=str)
-    parser.add_argument('--ref_lid', type=str)
-    parser.add_argument('--nbest_lid', type=str)
-    parser.add_argument('--ref_asr', type=str)
-    parser.add_argument('--nbest_asr', type=str)
-    parser.add_argument('--iters', type=int, default=10000)
-    parser.add_argument('--slid_scale', type=int, default = 100)
-    parser.add_argument('--wlid_scale', type=int, default = 100)
-    parser.add_argument('--asr_scale', type=int, default = 10)
-    parser.add_argument('--lm_scale', type=int, default = 10)
-    parser.add_argument('--uasr_scale', type=int, default = 10)
-    parser.add_argument('--len_scale', type=int, default = 1)
-    parser.add_argument('--num_jobs', type=int, default = 64)
-    parser.add_argument('--exclude', nargs="*", default=None)  # exclude langs
+    parser = argparse.ArgumentParser(description="Example argument parser")
+    parser.add_argument("--slid", type=str)
+    parser.add_argument("--wlid", type=str)
+    parser.add_argument("--asr", type=str)
+    parser.add_argument("--lm", type=str)
+    parser.add_argument("--uasr", type=str)
+    parser.add_argument("--n", type=int, default=10)
+    parser.add_argument("--dst", type=str)
+    parser.add_argument("--ref_lid", type=str)
+    parser.add_argument("--nbest_lid", type=str)
+    parser.add_argument("--ref_asr", type=str)
+    parser.add_argument("--nbest_asr", type=str)
+    parser.add_argument("--iters", type=int, default=10000)
+    parser.add_argument("--slid_scale", type=int, default=100)
+    parser.add_argument("--wlid_scale", type=int, default=100)
+    parser.add_argument("--asr_scale", type=int, default=10)
+    parser.add_argument("--lm_scale", type=int, default=10)
+    parser.add_argument("--uasr_scale", type=int, default=10)
+    parser.add_argument("--len_scale", type=int, default=1)
+    parser.add_argument("--num_jobs", type=int, default=64)
+    parser.add_argument("--exclude", nargs="*", default=None)  # exclude langs
     args = parser.parse_args()
 
     slid = [float(x.strip()) for x in open(args.slid, "r").readlines()]
@@ -90,7 +114,7 @@ if __name__ == "__main__":
     assert len(lm) == len(uasr)
 
     ref_lid = [x.strip() for x in open(args.ref_lid, "r").readlines()]
-    nbest_lid= [x.strip() for x in open(args.nbest_lid, "r").readlines()]
+    nbest_lid = [x.strip() for x in open(args.nbest_lid, "r").readlines()]
     ref_asr = [x.strip() for x in open(args.ref_asr, "r").readlines()]
     nbest_asr = [x.strip() for x in open(args.nbest_asr, "r").readlines()]
 
@@ -100,8 +124,11 @@ if __name__ == "__main__":
 
     lengths = [len(x) for x in nbest_asr]
 
-    feats = [[s, w, a, l, u, le] for s,w,a,l,u,le in zip(slid, wlid, asr, lm, uasr, lengths)]
- 
+    feats = [
+        [s, w, a, l, u, le]
+        for s, w, a, l, u, le in zip(slid, wlid, asr, lm, uasr, lengths)
+    ]
+
     weights = []
     for i in range(args.iters):
         s_w = np.random.rand() * args.slid_scale
@@ -109,14 +136,23 @@ if __name__ == "__main__":
         a_w = np.random.rand() * args.asr_scale
         l_w = np.random.rand() * args.lm_scale
         u_w = np.random.rand() * args.uasr_scale
-        le_w = (np.random.rand() -0.5) * args.len_scale
+        le_w = (np.random.rand() - 0.5) * args.len_scale
         weights.append([s_w, w_w, a_w, l_w, u_w, le_w])
 
     num_tries = len(weights)
     print("Total number of search points", num_tries)
     threads = args.num_jobs
     pool = Pool(threads)
-    compute_fxn = partial(compute, feats=feats, ref_lid=ref_asr, nbest_lid=nbest_lid, ref_asr=ref_asr, nbest_asr=nbest_asr, n=args.n, exclude=args.exclude)
+    compute_fxn = partial(
+        compute,
+        feats=feats,
+        ref_lid=ref_asr,
+        nbest_lid=nbest_lid,
+        ref_asr=ref_asr,
+        nbest_asr=nbest_asr,
+        n=args.n,
+        exclude=args.exclude,
+    )
     results = pool.map(compute_fxn, weights)
     pool.close()
     pool.join()
@@ -129,10 +165,10 @@ if __name__ == "__main__":
         os.makedirs(args.dst)
     with open(args.dst + "/results.all", "w") as f_out:
         for result in results:
-            f_out.write(str(result)+"\n")
+            f_out.write(str(result) + "\n")
             if result["asr_wer"] < wer_best:
                 wer_best = result["asr_wer"]
                 best = result
 
     with open(args.dst + "/best_coefficients", "w") as f_out:
-        f_out.write(str(best)+"\n")
+        f_out.write(str(best) + "\n")

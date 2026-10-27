@@ -3,11 +3,11 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 """
-    This module contains collection of classes which implement
-    collate functionalities for various tasks.
+This module contains collection of classes which implement
+collate functionalities for various tasks.
 
-    Collaters should know what data to expect for each sample
-    and they should pack / collate them into batches
+Collaters should know what data to expect for each sample
+and they should pack / collate them into batches
 """
 
 

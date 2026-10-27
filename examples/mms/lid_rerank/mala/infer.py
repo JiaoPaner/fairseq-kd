@@ -15,22 +15,26 @@ if __name__ == "__main__":
     if not os.path.exists(args.dst):
         os.makedirs(args.dst)
 
-    base_model = AutoModelForCausalLM.from_pretrained('meta-llama/Llama-2-7b-hf')
+    base_model = AutoModelForCausalLM.from_pretrained("meta-llama/Llama-2-7b-hf")
     base_model.resize_token_embeddings(260164)
-    tokenizer = AutoTokenizer.from_pretrained('MaLA-LM/mala-500')
+    tokenizer = AutoTokenizer.from_pretrained("MaLA-LM/mala-500")
     if args.gpu == 1:
-        model = PeftModel.from_pretrained(base_model, 'MaLA-LM/mala-500').to("cuda")
+        model = PeftModel.from_pretrained(base_model, "MaLA-LM/mala-500").to("cuda")
     else:
-        model = PeftModel.from_pretrained(base_model, 'MaLA-LM/mala-500')
+        model = PeftModel.from_pretrained(base_model, "MaLA-LM/mala-500")
     model.eval()
 
     txts = [x.strip() for x in open(args.txt, "r").readlines()]
 
     with open(args.dst + "/lm_score", "w", buffering=1) as f:
         for t in tqdm(txts):
-            input_tokens = tokenizer("", add_special_tokens=True, return_tensors='pt').input_ids
+            input_tokens = tokenizer(
+                "", add_special_tokens=True, return_tensors="pt"
+            ).input_ids
             if len(t) > 0:
-                output_tokens = tokenizer(t, add_special_tokens=False, return_tensors='pt').input_ids
+                output_tokens = tokenizer(
+                    t, add_special_tokens=False, return_tensors="pt"
+                ).input_ids
                 tokens = torch.cat([input_tokens, output_tokens], dim=1)
                 length = output_tokens.shape[-1]
             else:
@@ -43,7 +47,7 @@ if __name__ == "__main__":
             with torch.no_grad():
                 outputs = model(tokens)
                 logits = outputs.logits
-            
+
             log_sum = 0
             for i in range(tokens.shape[-1] - 1):
                 past_tok, current_tok = i, i + 1

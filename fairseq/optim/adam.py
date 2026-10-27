@@ -19,6 +19,7 @@ from omegaconf import II, OmegaConf
 
 
 logger = logging.getLogger(__name__)
+device_name = torch.cuda.get_device_name(0)
 
 
 @dataclass
@@ -29,9 +30,7 @@ class FairseqAdamConfig(FairseqDataclass):
     adam_eps: float = field(
         default=1e-8, metadata={"help": "epsilon for Adam optimizer"}
     )
-    adam_stable: bool = field(
-        default=False, metadata={"help": "use stable Adam"}
-    )
+    adam_stable: bool = field(default=False, metadata={"help": "use stable Adam"})
     weight_decay: float = field(default=0.0, metadata={"help": "weight decay"})
     fp16_adam_stats: bool = field(
         default=False, metadata={"help": "use FP16 stats (with automatic scaling)"}
@@ -54,7 +53,8 @@ class FairseqAdam(FairseqOptimizer):
         super().__init__(cfg)
         fused_adam_cls = get_fused_adam_class()
         use_fused_adam = (
-            fused_adam_cls is not None
+            device_name.startswith("NVIDIA")
+            and fused_adam_cls is not None
             and torch.cuda.is_available()
         )
         if getattr(cfg, "tpu", False):
@@ -248,7 +248,11 @@ class Adam(torch.optim.Optimizer):
                 else:
                     rms = 1.0
 
-                step_size = group["lr"] * math.sqrt(bias_correction2) / (bias_correction1 * max(1.0, rms))
+                step_size = (
+                    group["lr"]
+                    * math.sqrt(bias_correction2)
+                    / (bias_correction1 * max(1.0, rms))
+                )
 
                 if group["weight_decay"] != 0:
                     p_data_fp32.add_(

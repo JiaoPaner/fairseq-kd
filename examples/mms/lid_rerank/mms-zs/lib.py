@@ -236,4 +236,10 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
   m.def("falign", &falign_cuda, "falign cuda");
 }
 """
-falign_ext = torch.utils.cpp_extension.load_inline("falign", cpp_sources="", cuda_sources=cuda_source, extra_cflags=['-O3'], verbose=True )
+falign_ext = torch.utils.cpp_extension.load_inline(
+    "falign",
+    cpp_sources="",
+    cuda_sources=cuda_source,
+    extra_cflags=["-O3"],
+    verbose=True,
+)

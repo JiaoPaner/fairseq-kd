@@ -4,7 +4,7 @@
 # LICENSE file in the root directory of this source tree.
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import torch.nn.functional as F
 from fairseq import utils
@@ -17,13 +17,20 @@ from omegaconf import II
 @dataclass
 class CrossEntropyCriterionConfig(FairseqDataclass):
     sentence_avg: bool = II("optimization.sentence_avg")
+    length_normalize_loss: bool = field(
+        default=False,
+        metadata={
+            "help": "Length normalize loss to adjust for joint training with sentence and document-level data"
+        },
+    )
 
 
 @register_criterion("cross_entropy", dataclass=CrossEntropyCriterionConfig)
 class CrossEntropyCriterion(FairseqCriterion):
-    def __init__(self, task, sentence_avg):
+    def __init__(self, task, sentence_avg, length_normalize_loss=False):
         super().__init__(task)
         self.sentence_avg = sentence_avg
+        self.length_normalize_loss = length_normalize_loss
 
     def forward(self, model, sample, reduce=True):
         """Compute the loss for the given sample.
@@ -46,16 +53,33 @@ class CrossEntropyCriterion(FairseqCriterion):
         }
         return loss, sample_size, logging_output
 
-    def compute_loss(self, model, net_output, sample, reduce=True):
+    def get_lprobs_and_target(self, model, net_output, sample):
         lprobs = model.get_normalized_probs(net_output, log_probs=True)
-        lprobs = lprobs.view(-1, lprobs.size(-1))
-        target = model.get_targets(sample, net_output).view(-1)
+        target = model.get_targets(sample, net_output)
+        return lprobs, target
+
+    def compute_loss(self, model, net_output, sample, reduce=True):
+        lprobs, target = self.get_lprobs_and_target(model, net_output, sample)
+
         loss = F.nll_loss(
-            lprobs,
-            target,
+            input=lprobs.transpose(-2, -1),
+            target=target,
+            reduction="none",
             ignore_index=self.padding_idx,
-            reduction="sum" if reduce else "none",
         )
+
+        if self.length_normalize_loss:
+            token_lens = (
+                target.ne(self.padding_idx)
+                .sum(dim=1, keepdim=True)
+                .clamp(min=1)
+                .float()
+            )
+            loss /= token_lens
+
+        if reduce:
+            loss = loss.sum()
+
         return loss, loss
 
     @staticmethod

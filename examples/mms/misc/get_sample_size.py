@@ -7,7 +7,7 @@
 """
 Usage:
     $ python misc/get_sample_size.py <input_file> > <output_file>
-    
+
     <input_file> contains list of wav files
     $ cat <input_file>
       /path/to/audio_1.wav

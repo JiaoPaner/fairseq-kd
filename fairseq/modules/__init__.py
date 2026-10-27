@@ -74,8 +74,7 @@ __all__ = [
     "EMAModuleConfig",
     "FactorizedEmbedding",
     "FastMultiheadAttention",
-    "FastGroupedQueryAttention"
-    "FairseqDropout",
+    "FastGroupedQueryAttention" "FairseqDropout",
     "Fp32BatchNorm",
     "Fp32GroupNorm",
     "Fp32LayerNorm",

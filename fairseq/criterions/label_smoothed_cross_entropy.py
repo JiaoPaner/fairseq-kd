@@ -28,14 +28,26 @@ class LabelSmoothedCrossEntropyCriterionConfig(FairseqDataclass):
         default=0,
         metadata={"help": "Ignore first N tokens"},
     )
+    length_normalize_loss: bool = field(
+        default=False,
+        metadata={
+            "help": "Length normalize loss to adjust for joint training with sentence and document-level data"
+        },
+    )
     sentence_avg: bool = II("optimization.sentence_avg")
 
 
-def label_smoothed_nll_loss(lprobs, target, epsilon, ignore_index=None, reduce=True):
+def label_smoothed_nll_loss(
+    lprobs, target, epsilon, ignore_index=None, length_normalize=False, reduce=True
+):
+    B, L, _ = lprobs.shape
+
     if target.dim() == lprobs.dim() - 1:
         target = target.unsqueeze(-1)
+
     nll_loss = -lprobs.gather(dim=-1, index=target)
     smooth_loss = -lprobs.sum(dim=-1, keepdim=True)
+
     if ignore_index is not None:
         pad_mask = target.eq(ignore_index)
         nll_loss.masked_fill_(pad_mask, 0.0)
@@ -43,9 +55,24 @@ def label_smoothed_nll_loss(lprobs, target, epsilon, ignore_index=None, reduce=T
     else:
         nll_loss = nll_loss.squeeze(-1)
         smooth_loss = smooth_loss.squeeze(-1)
+
+    if length_normalize:
+        token_lens = (
+            (
+                target.ne(ignore_index).squeeze(-1).sum(-1)
+                if ignore_index is not None
+                else torch.full((B,), L, device=target.device)
+            )
+            .clamp(min=1)
+            .float()
+        )
+        nll_loss = nll_loss.squeeze(dim=-1).sum(dim=-1) / token_lens
+        smooth_loss = smooth_loss.squeeze(dim=-1).sum(dim=-1) / token_lens
+
     if reduce:
         nll_loss = nll_loss.sum()
         smooth_loss = smooth_loss.sum()
+
     eps_i = epsilon / (lprobs.size(-1) - 1)
     loss = (1.0 - epsilon - eps_i) * nll_loss + eps_i * smooth_loss
     return loss, nll_loss
@@ -62,10 +89,12 @@ class LabelSmoothedCrossEntropyCriterion(FairseqCriterion):
         label_smoothing,
         ignore_prefix_size=0,
         report_accuracy=False,
+        length_normalize_loss=False,
     ):
         super().__init__(task)
         self.sentence_avg = sentence_avg
         self.eps = label_smoothing
+        self.length_normalize_loss = length_normalize_loss
         self.ignore_prefix_size = ignore_prefix_size
         self.report_accuracy = report_accuracy
 
@@ -99,10 +128,9 @@ class LabelSmoothedCrossEntropyCriterion(FairseqCriterion):
         lprobs = model.get_normalized_probs(net_output, log_probs=True)
         target = model.get_targets(sample, net_output)
         if self.ignore_prefix_size > 0:
-            # lprobs: B x T x C
             lprobs = lprobs[:, self.ignore_prefix_size :, :].contiguous()
             target = target[:, self.ignore_prefix_size :].contiguous()
-        return lprobs.view(-1, lprobs.size(-1)), target.view(-1)
+        return lprobs, target
 
     def compute_loss(self, model, net_output, sample, reduce=True):
         lprobs, target = self.get_lprobs_and_target(model, net_output, sample)
@@ -110,8 +138,9 @@ class LabelSmoothedCrossEntropyCriterion(FairseqCriterion):
             lprobs,
             target,
             self.eps,
-            ignore_index=self.padding_idx,
             reduce=reduce,
+            ignore_index=self.padding_idx,
+            length_normalize=self.length_normalize_loss,
         )
         return loss, nll_loss
 

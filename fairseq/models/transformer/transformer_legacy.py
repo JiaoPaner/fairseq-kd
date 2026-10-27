@@ -314,7 +314,9 @@ def transformer_IT2_dist(args):
 @register_model_architecture("transformer", "roformer_IT2_dist")
 def roformer_IT2_dist(args):
     args.attn_implementation = getattr(args, "attn_implementation", "fast")
-    args.no_token_positional_embeddings = getattr(args, "no_token_positional_embeddings", True)
+    args.no_token_positional_embeddings = getattr(
+        args, "no_token_positional_embeddings", True
+    )
     args.rope_args = getattr(args, "rope_args", '{"theta": 10000}')
     transformer_IT2_dist(args)
 

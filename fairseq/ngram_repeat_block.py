@@ -1,7 +1,7 @@
 # Originally from Microsoft Corporation.
 # Licensed under the MIT License.
 
-""" Wrapper for ngram_repeat_block cuda extension """
+"""Wrapper for ngram_repeat_block cuda extension"""
 import math
 import warnings
 from typing import List

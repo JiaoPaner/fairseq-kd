@@ -48,28 +48,26 @@ class LMDistillationCriterion(CrossEntropyCriterion):
         kd_args=None,
         ignore_prefix_size=0,
         report_accuracy=False,
+        length_normalize_loss=False,
     ):
         super().__init__(task, sentence_avg)
         self.sentence_avg = sentence_avg
         self.ignore_prefix_size = ignore_prefix_size
         self.report_accuracy = report_accuracy
+        self.length_normalize_loss = length_normalize_loss
 
         # new parameters
-        assert kd_args is not None, "Knowledge distillation arguments are missing!"
+        assert (
+            kd_args is not None
+        ), "Knowledge distillation arguments (lambda) are missing!"
 
         kd_args = json.loads(kd_args)
 
-        self.strategy = kd_args.get("strategy", "on_policy")
         self.lambd = kd_args.get(
             "lambda", 1.0
         )  # lambda for ratio of KD loss and NLL loss
-        self.beta = kd_args.get("beta", 0.5)  # beta for JSD loss
-        self.loss_type = kd_args.get(
-            "loss_type", "forward_kld"
-        )  # possible values: ['forward_kld', 'reverse_kld', 'jsd']
 
-        assert self.lambd > 0.0 and self.lambd <= 1.0, "lambda should be in (0, 1]"
-        assert self.beta > 0.0 and self.beta < 1.0, "beta should be in (0, 1)"
+        assert self.lambd > 0.0 and self.lambd <= 1.0, "lambda should be in (0, 1]."
 
     def forward(self, model, teacher_model, sample, update_num=None, reduce=True):
         """Compute the loss for the given sample.
@@ -121,15 +119,13 @@ class LMDistillationCriterion(CrossEntropyCriterion):
             logging_output["total"] = utils.item(total.data)
         return loss, sample_size, logging_output
 
-    # copied from label_smoothed_cross_entropy.py
     def get_lprobs_and_target(self, model, net_output, sample, log_probs=True):
         lprobs = model.get_normalized_probs(net_output, log_probs=log_probs)
         target = model.get_targets(sample, net_output)
         if self.ignore_prefix_size > 0:
-            # lprobs: B x T x C
             lprobs = lprobs[:, self.ignore_prefix_size :, :].contiguous()
             target = target[:, self.ignore_prefix_size :].contiguous()
-        return lprobs.view(-1, lprobs.size(-1)), target.view(-1)
+        return lprobs, target
 
     # helper function to compute the kd loss
     def compute_kd_loss(self, model, net_output, sample, teacher_model, teacher_output):
@@ -139,50 +135,44 @@ class LMDistillationCriterion(CrossEntropyCriterion):
         )
         pad_mask = target.eq(self.padding_idx).unsqueeze(-1)
 
-        if self.loss_type == "forward_kld":
-            kd_loss = F.kl_div(
-                lprobs, teacher_lprobs, log_target=True, reduction="none"
-            )
-            kd_loss = kd_loss.masked_fill_(pad_mask, 0.0).sum()
-        elif self.loss_type == "reverse_kld":
-            kd_loss = F.kl_div(
-                teacher_lprobs, lprobs, log_target=True, reduction="none"
-            )
-            kd_loss = kd_loss.masked_fill_(pad_mask, 0.0).sum()
-        elif self.loss_type == "jsd":
-            probs, _ = self.get_lprobs_and_target(
-                model, net_output, sample, log_probs=False
-            )
-            teacher_probs, _ = self.get_lprobs_and_target(
-                teacher_model, teacher_output, sample, log_probs=False
-            )
+        kd_loss = (
+            F.kl_div(lprobs, teacher_lprobs, log_target=True, reduction="none")
+            .masked_fill_(pad_mask, 0.0)
+            .sum(dim=-1)
+        )
 
-            m_log = torch.log(self.beta * probs + (1 - self.beta) * teacher_probs)
+        token_lens = (
+            target.ne(self.padding_idx).sum(dim=1, keepdim=True).clamp(min=1).float()
+        )
 
-            kd_loss = self.beta * F.kl_div(
-                m_log, lprobs, log_target=True, reduction="none"
-            ) + (1 - self.beta) * F.kl_div(
-                m_log, teacher_lprobs, log_target=True, reduction="none"
-            )
-            kd_loss = kd_loss.masked_fill_(pad_mask, 0.0).sum()
-        else:
-            raise ValueError(
-                f"Unknown loss type: {self.loss_type}. Choose from ['forward_kld', 'reverse_kld', 'jsd']"
-            )
+        kd_loss = (
+            (kd_loss.sum(dim=1) / token_lens)
+            if self.length_normalize_loss
+            else kd_loss.sum(dim=1)
+        ).sum()
 
-        return kd_loss, lprobs, target
+        return kd_loss, lprobs, target, token_lens
 
     def compute_loss(
         self, model, net_output, sample, teacher_model=None, teacher_output=None
     ):
-        kd_loss, lprobs, target = self.compute_kd_loss(
+        kd_loss, lprobs, target, token_lens = self.compute_kd_loss(
             model, net_output, sample, teacher_model, teacher_output
         )
 
         # compute preliminary nll_loss of student_model
         nll_loss = F.nll_loss(
-            lprobs, target, ignore_index=self.padding_idx, reduction="sum"
+            input=lprobs.transpose(-2, -1),
+            target=target,
+            reduction="none",
+            ignore_index=self.padding_idx,
         )
+
+        nll_loss = (
+            (nll_loss.sum(dim=1) / token_lens)
+            if self.length_normalize_loss
+            else nll_loss.sum(dim=1)
+        ).sum()
 
         loss = self.lambd * kd_loss + (1 - self.lambd) * nll_loss
         return loss, {"kd_loss": kd_loss, "nll_loss": nll_loss}

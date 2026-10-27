@@ -7,6 +7,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+device_name = torch.cuda.get_device_name(0)
+
 try:
     from apex.normalization import FusedLayerNorm as _FusedLayerNorm
 
@@ -28,7 +30,12 @@ except ImportError:
 def LayerNorm(normalized_shape, eps=1e-5, elementwise_affine=True, export=False):
     if torch.jit.is_scripting() or torch.jit.is_tracing():
         export = True
-    if not export and torch.cuda.is_available() and has_fused_layernorm:
+    if (
+        not export
+        and device_name.startswith("NVIDIA")
+        and torch.cuda.is_available()
+        and has_fused_layernorm
+    ):
         return FusedLayerNorm(
             normalized_shape=normalized_shape,
             eps=eps,

@@ -411,6 +411,11 @@ def should_stop_early(cfg: DictConfig, valid_loss: float) -> bool:
     if prev_best is None or is_better(valid_loss, prev_best):
         should_stop_early.best = valid_loss
         should_stop_early.num_runs = 0
+        logger.info(
+            "remaining patience {}".format(
+                cfg.checkpoint.patience - should_stop_early.num_runs
+            )
+        )
         return False
     else:
         should_stop_early.num_runs += 1
@@ -733,7 +738,7 @@ def get_valid_stats(
 
 
 def cli_main(
-    modify_parser: Optional[Callable[[argparse.ArgumentParser], None]] = None
+    modify_parser: Optional[Callable[[argparse.ArgumentParser], None]] = None,
 ) -> None:
     parser = options.get_training_parser()
     args = options.parse_args_and_arch(parser, modify_parser=modify_parser)

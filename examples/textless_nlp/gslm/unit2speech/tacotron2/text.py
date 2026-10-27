@@ -1,4 +1,4 @@
-""" from https://github.com/keithito/tacotron """
+"""from https://github.com/keithito/tacotron"""
 
 import numpy as np
 import re

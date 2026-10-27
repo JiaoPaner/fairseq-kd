@@ -37,7 +37,9 @@ class RotaryEmbedding(torch.nn.Module):
         self.scaling_factor = scaling_factor
         self.apply_rotary_emb = staticmethod(apply_rotary_emb)
 
-        inv_freq = 1.0 / (theta ** (torch.arange(0, dim, 2, dtype=torch.float32, device=device) / dim))
+        inv_freq = 1.0 / (
+            theta ** (torch.arange(0, dim, 2, dtype=torch.float32, device=device) / dim)
+        )
 
         self.register_buffer("inv_freq", inv_freq, persistent=False)
         self.precompute_freqs(max_seq_len)

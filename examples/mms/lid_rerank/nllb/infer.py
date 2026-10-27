@@ -10,16 +10,30 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--txt", type=str)
 parser.add_argument("--dst", type=str)
 parser.add_argument("--model", type=str)
-parser.add_argument('--lid', type=str)
+parser.add_argument("--lid", type=str)
 args = parser.parse_args()
 
-mapping = {"arb":"ara", "azj":"aze", "pes":"fas", "fuv":"ful", "lvs":"lav", "khk":"mon", "zsm":"zlm", "gaz":"orm", "pbt":"pus", "uzn":"uzb", "zho":"cmn"}
+mapping = {
+    "arb": "ara",
+    "azj": "aze",
+    "pes": "fas",
+    "fuv": "ful",
+    "lvs": "lav",
+    "khk": "mon",
+    "zsm": "zlm",
+    "gaz": "orm",
+    "pbt": "pus",
+    "uzn": "uzb",
+    "zho": "cmn",
+}
+
 
 def fix_code(x):
     code = x.split("_")[-2]
     if code in mapping:
         code = mapping[code]
     return code
+
 
 if __name__ == "__main__":
     if not os.path.exists(args.dst):
@@ -33,9 +47,11 @@ if __name__ == "__main__":
     assert len(txts) == len(lids)
 
     with open(args.dst + "/wlid_score", "w") as f:
-        for t,l in tqdm(zip(txts, lids)):
-            predictions = model.predict(t, k=218)    # max 218
-            predictions = [(fix_code(x), y) for x, y in zip(predictions[0], predictions[1])]
+        for t, l in tqdm(zip(txts, lids)):
+            predictions = model.predict(t, k=218)  # max 218
+            predictions = [
+                (fix_code(x), y) for x, y in zip(predictions[0], predictions[1])
+            ]
 
             try:
                 pred_langs = [x[0] for x in predictions]

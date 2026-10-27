@@ -102,7 +102,9 @@ class FastGroupedQueryAttention(MultiheadAttention):
                     qn_block_size,
                 )
             else:
-                raise NotImplementedError("Fused qkv is only supported for self-attention or encoder-decoder attention. Either of the two must be True.")
+                raise NotImplementedError(
+                    "Fused qkv is only supported for self-attention or encoder-decoder attention. Either of the two must be True."
+                )
         else:
             del self.k_proj, self.v_proj
             self.k_proj = quant_noise(

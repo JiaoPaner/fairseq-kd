@@ -25,10 +25,10 @@ ASR_SAMPLING_RATE = 16_000
 
 MODEL_ID = "/upload/mms_zs"
 
-processor = AutoProcessor.from_pretrained(args.model+MODEL_ID)
-model = Wav2Vec2ForCTC.from_pretrained(args.model+MODEL_ID)
+processor = AutoProcessor.from_pretrained(args.model + MODEL_ID)
+model = Wav2Vec2ForCTC.from_pretrained(args.model + MODEL_ID)
 
-token_file = args.model+"/upload/mms_zs/tokens.txt"
+token_file = args.model + "/upload/mms_zs/tokens.txt"
 
 if __name__ == "__main__":
     if not os.path.exists(args.dst):
@@ -70,14 +70,16 @@ if __name__ == "__main__":
             outputs = model(**inputs).logits
 
         emissions = outputs.log_softmax(dim=-1).squeeze()
-        
+
         for j in range(args.n):
             idx = (args.n * i) + j
             chars = txts[idx].split()
             token_sequence = [tokens.index(x) for x in chars]
-        
+
             try:
-                _, alphas, _ = falign_ext.falign(emissions, torch.tensor(token_sequence, device=device).int(), False)
+                _, alphas, _ = falign_ext.falign(
+                    emissions, torch.tensor(token_sequence, device=device).int(), False
+                )
                 aligned_alpha = max(alphas[-1]).item()
             except:
                 aligned_alpha = math.log(0.000000001)
